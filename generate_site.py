@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import html
 import sqlite3
+from collections import defaultdict
 from pathlib import Path
 from typing import Iterable
 
@@ -123,6 +124,12 @@ def slugify(value: str) -> str:
         .replace(".", "")
         .replace("'", "")
     )
+
+
+def player_page_filename(player_key: str, player_label: str) -> str:
+    if player_key.startswith("p:"):
+        return f"{slugify(player_label)}-p{player_key.split(':', 1)[1]}.html"
+    return f"{slugify(player_label)}-{slugify(player_key.replace(':', '-'))}.html"
 
 
 def esc(value: object) -> str:
@@ -403,7 +410,7 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                 '<li><a href="years/index.html">Player leaderboards by season</a></li>'
                 "</ul>",
                 "../",
-                intro="Sortable player leaderboards across all teams, with every raw total and per-game rate in one place.",
+                intro="Sortable player leaderboards across all teams, with every raw total and per-game rate in one place. Click a player name from a table to open that player's page.",
             ),
         )
         write_text(
@@ -430,13 +437,17 @@ def build_site(db_path: Path, out_dir: Path) -> None:
 
         team_year_sql = f"""
             SELECT
+                CASE
+                    WHEN p.id IS NOT NULL THEN 'p:' || p.id
+                    ELSE 'n:' || pad.player_name
+                END AS player_key,
                 COALESCE(p.name, pad.player_name) AS label,
                 COUNT(*) AS games,
                 {aggregate_exprs('pad', 'COUNT(*)')}
             FROM player_appearance_details pad
             LEFT JOIN players p ON p.id = pad.player_id
             WHERE pad.team = ? AND pad.season = ?
-            GROUP BY COALESCE(p.name, pad.player_name)
+            GROUP BY player_key, label
             ORDER BY disposals_total DESC, games DESC, label
         """
 
@@ -451,27 +462,83 @@ def build_site(db_path: Path, out_dir: Path) -> None:
             ORDER BY pad.team
         """
 
+        player_identity_select = """
+                CASE
+                    WHEN p.id IS NOT NULL THEN 'p:' || p.id
+                    ELSE 'n:' || pad.player_name
+                END AS player_key,
+                COALESCE(p.name, pad.player_name) AS label
+        """
+
         player_all_time_sql = f"""
             SELECT
-                COALESCE(p.name, pad.player_name) AS label,
+                {player_identity_select},
                 COUNT(*) AS games,
                 {aggregate_exprs('pad', 'COUNT(*)')}
             FROM player_appearance_details pad
             LEFT JOIN players p ON p.id = pad.player_id
-            GROUP BY COALESCE(p.name, pad.player_name)
+            GROUP BY player_key, label
             ORDER BY disposals_total DESC, games DESC, label
         """
 
         player_year_sql = f"""
             SELECT
-                COALESCE(p.name, pad.player_name) AS label,
+                {player_identity_select},
                 COUNT(*) AS games,
                 {aggregate_exprs('pad', 'COUNT(*)')}
             FROM player_appearance_details pad
             LEFT JOIN players p ON p.id = pad.player_id
             WHERE pad.season = ?
-            GROUP BY COALESCE(p.name, pad.player_name)
+            GROUP BY player_key, label
             ORDER BY disposals_total DESC, games DESC, label
+        """
+
+        player_season_summary_sql = f"""
+            SELECT
+                CASE
+                    WHEN p.id IS NOT NULL THEN 'p:' || p.id
+                    ELSE 'n:' || pad.player_name
+                END AS player_key,
+                CAST(pad.season AS TEXT) AS label,
+                pad.season AS season,
+                COUNT(*) AS games,
+                {aggregate_exprs('pad', 'COUNT(*)')}
+            FROM player_appearance_details pad
+            LEFT JOIN players p ON p.id = pad.player_id
+            GROUP BY player_key, pad.season
+            ORDER BY player_key, pad.season DESC
+        """
+
+        player_team_summary_sql = f"""
+            SELECT
+                CASE
+                    WHEN p.id IS NOT NULL THEN 'p:' || p.id
+                    ELSE 'n:' || pad.player_name
+                END AS player_key,
+                pad.team AS label,
+                COUNT(*) AS games,
+                {aggregate_exprs('pad', 'COUNT(*)')}
+            FROM player_appearance_details pad
+            LEFT JOIN players p ON p.id = pad.player_id
+            GROUP BY player_key, pad.team
+            ORDER BY player_key, games DESC, label
+        """
+
+        player_team_season_summary_sql = f"""
+            SELECT
+                CASE
+                    WHEN p.id IS NOT NULL THEN 'p:' || p.id
+                    ELSE 'n:' || pad.player_name
+                END AS player_key,
+                pad.team || ' ' || pad.season AS label,
+                pad.team AS team,
+                pad.season AS season,
+                COUNT(*) AS games,
+                {aggregate_exprs('pad', 'COUNT(*)')}
+            FROM player_appearance_details pad
+            LEFT JOIN players p ON p.id = pad.player_id
+            GROUP BY player_key, pad.team, pad.season
+            ORDER BY player_key, pad.season DESC, games DESC, pad.team
         """
 
         for team_row in team_rows:
@@ -506,11 +573,14 @@ def build_site(db_path: Path, out_dir: Path) -> None:
             for row in summary_rows:
                 season = row["season"]
                 player_rows = query_rows(conn, team_year_sql, (team, season))
+                for player_row in player_rows:
+                    player_row["player_file"] = f'../../players/{player_page_filename(player_row["player_key"], player_row["label"])}'
                 player_body = stats_table(
                     player_rows,
                     "label",
                     "Player",
                     f"team-{team_slug}-{season}",
+                    link_template="{player_file}",
                     notes="Per-game columns here are player totals divided by the number of games that player appeared in for this team and season.",
                 )
                 write_text(
@@ -549,11 +619,14 @@ def build_site(db_path: Path, out_dir: Path) -> None:
             )
 
             player_year_rows = query_rows(conn, player_year_sql, (season,))
+            for row in player_year_rows:
+                row["player_file"] = player_page_filename(row["player_key"], row["label"])
             player_year_body = stats_table(
                 player_year_rows,
                 "label",
                 "Player",
                 f"players-year-{season}",
+                link_template="../{player_file}",
                 notes="Per-game columns here are player totals divided by that player's games in the selected season.",
             )
             write_text(
@@ -567,11 +640,14 @@ def build_site(db_path: Path, out_dir: Path) -> None:
             )
 
         player_all_time_rows = query_rows(conn, player_all_time_sql)
+        for row in player_all_time_rows:
+            row["player_file"] = player_page_filename(row["player_key"], row["label"])
         player_all_time_body = stats_table(
             player_all_time_rows,
             "label",
             "Player",
             "players-all-time",
+            link_template="{player_file}",
             notes="Per-game columns here are career totals divided by career games in the database.",
         )
         write_text(
@@ -583,6 +659,115 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                 intro="League-wide player leaderboards across the full database. Sort any column to find most kicks per game, most disposals overall, and more.",
             ),
         )
+
+        player_meta_by_key = {
+            row["player_key"]: row
+            for row in query_rows(
+                conn,
+                """
+                SELECT
+                    'p:' || id AS player_key,
+                    name,
+                    birth_date,
+                    height_cm,
+                    weight_kg,
+                    career_summary
+                FROM players
+                """,
+            )
+        }
+
+        player_season_rows_by_key: dict[str, list[dict]] = defaultdict(list)
+        for row in query_rows(conn, player_season_summary_sql):
+            row["season_file"] = f'years/{row["season"]}.html'
+            player_season_rows_by_key[row["player_key"]].append(row)
+
+        player_team_rows_by_key: dict[str, list[dict]] = defaultdict(list)
+        for row in query_rows(conn, player_team_summary_sql):
+            player_team_rows_by_key[row["player_key"]].append(row)
+
+        player_team_season_rows_by_key: dict[str, list[dict]] = defaultdict(list)
+        for row in query_rows(conn, player_team_season_summary_sql):
+            row["team_slug"] = slugify(row["team"])
+            row["team_season_file"] = f'../teams/{row["team_slug"]}/{row["season"]}.html'
+            player_team_season_rows_by_key[row["player_key"]].append(row)
+
+        for player_row in player_all_time_rows:
+            player_key = player_row["player_key"]
+            player_name = player_row["label"]
+            player_file = player_row["player_file"]
+
+            season_rows = player_season_rows_by_key.get(player_key, [])
+            team_rows = player_team_rows_by_key.get(player_key, [])
+            team_season_rows = player_team_season_rows_by_key.get(player_key, [])
+
+            meta = player_meta_by_key.get(player_key, {})
+            summary_items = [f"Career games in DB: {esc(player_row['games'])}"]
+            if meta.get("birth_date"):
+                summary_items.append(f"Born: {esc(meta['birth_date'])}")
+            if meta.get("height_cm"):
+                summary_items.append(f"Height: {esc(meta['height_cm'])} cm")
+            if meta.get("weight_kg"):
+                summary_items.append(f"Weight: {esc(meta['weight_kg'])} kg")
+
+            body = (
+                '<ul class="summary">' + "".join(f"<li>{item}</li>" for item in summary_items) + "</ul>"
+            )
+            if meta.get("career_summary"):
+                body += f'<p>{esc(meta["career_summary"])}</p>'
+
+            body += section(
+                "Career Totals",
+                stats_table(
+                    [player_row],
+                    "label",
+                    "Player",
+                    f'player-career-{player_key.replace(":", "-")}',
+                    notes="Career totals and per-game averages across every game for this player in the database.",
+                ),
+            )
+            body += section(
+                "By Season",
+                stats_table(
+                    season_rows,
+                    "label",
+                    "Season",
+                    f'player-seasons-{player_key.replace(":", "-")}',
+                    link_template="{season_file}",
+                    notes="Per-game columns here are season totals divided by games played in that season.",
+                ),
+            )
+            body += section(
+                "By Team",
+                stats_table(
+                    team_rows,
+                    "label",
+                    "Team",
+                    f'player-teams-{player_key.replace(":", "-")}',
+                    notes="Per-game columns here are totals divided by games played for that team.",
+                ),
+            )
+            body += section(
+                "By Team and Season",
+                stats_table(
+                    team_season_rows,
+                    "label",
+                    "Team / Season",
+                    f'player-team-seasons-{player_key.replace(":", "-")}',
+                    link_template="{team_season_file}",
+                    notes="Per-game columns here are totals divided by games played for that team in that season.",
+                ),
+            )
+
+            write_text(
+                out_dir / "players" / player_file,
+                page_template(
+                    f"{player_name} Stats",
+                    body,
+                    "../",
+                    intro=f"Individual career, season, and team breakdowns for {player_name}.",
+                ),
+            )
     finally:
         conn.close()
 

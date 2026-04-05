@@ -8,6 +8,7 @@ The generated site includes:
 - season pages by team
 - all-time player leaderboards
 - player leaderboards for each season
+- individual player pages with career, season, team, and team-season breakdowns
 - sortable tables, hover explanations for every column, row filtering, and per-table column selection
 
 ## Regenerate
