@@ -367,15 +367,6 @@
         });
       });
 
-      const widthButton = document.querySelector(`[data-table-width-toggle="${this.tableId}"]`);
-      if (widthButton) {
-        widthButton.addEventListener("click", () => {
-          this.fullWidth = !this.fullWidth;
-          writeStorage(storageKey(this.tableId, "table-width"), this.fullWidth);
-          this.applyWidthMode();
-        });
-      }
-
       const statViewButton = document.querySelector(`[data-stat-view-toggle="${this.tableId}"]`);
       if (statViewButton) {
         statViewButton.addEventListener("click", () => {
@@ -395,10 +386,6 @@
 
     applyWidthMode() {
       this.shell.classList.toggle("table-shell-wide", this.fullWidth);
-      const button = document.querySelector(`[data-table-width-toggle="${this.tableId}"]`);
-      if (button) {
-        button.textContent = this.fullWidth ? "Narrower" : "Full width";
-      }
     }
 
     isColumnVisible(key) {

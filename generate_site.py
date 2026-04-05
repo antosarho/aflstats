@@ -371,7 +371,6 @@ def stats_table(
         '<div class="table-toolbar">'
         f'<label class="table-filter">Filter rows <input type="search" placeholder="Type to filter..." data-table-filter="{table_id}"></label>'
         '<div class="table-toolbar-actions">'
-        f'<button type="button" data-table-width-toggle="{table_id}">Full width</button>'
         f'<button type="button" data-stat-view-toggle="{table_id}" data-mode="both">Totals + averages</button>'
         f'<button type="button" data-columns-all="{table_id}">Show all columns</button>'
         f'<button type="button" data-columns-core="{table_id}">Core columns only</button>'
