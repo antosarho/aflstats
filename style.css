@@ -8,6 +8,9 @@
   --line: #d8ccba;
   --line-strong: #bda98a;
   --shadow: rgba(60, 40, 20, 0.08);
+  --team-primary: #7a1f1f;
+  --team-secondary: #d7b690;
+  --team-accent: #fffdf8;
 }
 
 * {
@@ -35,6 +38,40 @@ body {
   background: rgba(239, 229, 208, 0.96);
   border-bottom: 1px solid var(--line-strong);
   backdrop-filter: blur(6px);
+}
+
+body.team-page {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--team-secondary) 12%, white), rgba(255, 255, 255, 0)),
+    linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 8%, transparent), transparent 42%),
+    var(--paper);
+}
+
+body.team-page .site-header {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--team-primary) 92%, black 8%), color-mix(in srgb, var(--team-secondary) 76%, white 24%));
+  border-bottom-color: color-mix(in srgb, var(--team-primary) 58%, black 42%);
+}
+
+body.team-page .header-inner {
+  color: color-mix(in srgb, var(--team-accent) 92%, white 8%);
+}
+
+body.team-page .site-nav a,
+body.team-page .page-intro {
+  color: color-mix(in srgb, var(--team-accent) 94%, white 6%);
+}
+
+body.team-page .site-nav a {
+  text-decoration-color: color-mix(in srgb, var(--team-accent) 45%, transparent);
+}
+
+body.team-page .site-nav a:hover {
+  text-decoration-color: currentColor;
+}
+
+body.team-page h2 {
+  color: color-mix(in srgb, var(--team-primary) 78%, black 22%);
 }
 
 .header-inner,
@@ -103,6 +140,13 @@ a:hover {
   box-shadow: 0 8px 18px var(--shadow);
 }
 
+body.team-page .table-toolbar {
+  border-color: color-mix(in srgb, var(--team-primary) 35%, var(--line-strong) 65%);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--team-secondary) 15%, white 85%), rgba(255,255,255,0.96)),
+    rgba(255, 253, 248, 0.96);
+}
+
 .table-filter {
   display: flex;
   gap: 0.55rem;
@@ -136,6 +180,17 @@ button {
 button:hover,
 summary:hover {
   background: #e8d8bb;
+}
+
+body.team-page button,
+body.team-page .column-picker summary {
+  border-color: color-mix(in srgb, var(--team-primary) 35%, var(--line-strong) 65%);
+  background: color-mix(in srgb, var(--team-secondary) 22%, white 78%);
+}
+
+body.team-page button:hover,
+body.team-page .column-picker summary:hover {
+  background: color-mix(in srgb, var(--team-secondary) 34%, white 66%);
 }
 
 .table-toolbar-actions {
@@ -186,6 +241,10 @@ summary:hover {
   box-shadow: 0 6px 16px var(--shadow);
 }
 
+body.team-page .table-shell {
+  border-color: color-mix(in srgb, var(--team-primary) 35%, var(--line-strong) 65%);
+}
+
 .table-top-scroll {
   overflow-x: auto;
   overflow-y: hidden;
@@ -193,6 +252,11 @@ summary:hover {
   background:
     linear-gradient(90deg, rgba(122, 31, 31, 0.14), rgba(122, 31, 31, 0.02));
   border-bottom: 1px solid var(--line);
+}
+
+body.team-page .table-top-scroll {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--team-primary) 18%, transparent), color-mix(in srgb, var(--team-secondary) 10%, transparent));
 }
 
 .table-top-scroll-inner {
@@ -204,6 +268,13 @@ summary:hover {
   background:
     linear-gradient(90deg, rgba(122, 31, 31, 0.06), rgba(122, 31, 31, 0) 4rem),
     linear-gradient(270deg, rgba(122, 31, 31, 0.06), rgba(122, 31, 31, 0) 4rem),
+    var(--panel);
+}
+
+body.team-page .table-wrap {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--team-primary) 8%, transparent), rgba(122, 31, 31, 0) 4rem),
+    linear-gradient(270deg, color-mix(in srgb, var(--team-secondary) 10%, transparent), rgba(122, 31, 31, 0) 4rem),
     var(--panel);
 }
 
@@ -231,6 +302,10 @@ thead th {
   cursor: pointer;
 }
 
+body.team-page thead th {
+  background: color-mix(in srgb, var(--team-secondary) 30%, #e8dcc4 70%);
+}
+
 th:first-child,
 td:first-child {
   position: sticky;
@@ -240,6 +315,11 @@ td:first-child {
   background: #fff9ef;
 }
 
+body.team-page th:first-child,
+body.team-page td:first-child {
+  background: color-mix(in srgb, var(--team-accent) 20%, #fff9ef 80%);
+}
+
 thead th:first-child {
   z-index: 7;
 }
@@ -247,6 +327,11 @@ thead th:first-child {
 th[aria-sort="ascending"],
 th[aria-sort="descending"] {
   background: #dbc69f;
+}
+
+body.team-page th[aria-sort="ascending"],
+body.team-page th[aria-sort="descending"] {
+  background: color-mix(in srgb, var(--team-secondary) 42%, #dbc69f 58%);
 }
 
 .sort-indicator::before {

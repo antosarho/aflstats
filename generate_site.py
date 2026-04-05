@@ -115,6 +115,33 @@ STAT_COLUMNS = [
     },
 ]
 
+TEAM_THEMES = {
+    "Adelaide": {"primary": "#002b5c", "secondary": "#c8102e", "accent": "#f2a900"},
+    "Brisbane Bears": {"primary": "#7a263a", "secondary": "#00a3e0", "accent": "#f7a81b"},
+    "Brisbane Lions": {"primary": "#7a263a", "secondary": "#0057b8", "accent": "#f7a81b"},
+    "Carlton": {"primary": "#031a46", "secondary": "#7db7e8", "accent": "#ffffff"},
+    "Collingwood": {"primary": "#111111", "secondary": "#ffffff", "accent": "#b3b3b3"},
+    "Essendon": {"primary": "#1c1c1c", "secondary": "#d71920", "accent": "#b3b3b3"},
+    "Fitzroy": {"primary": "#7b1e3a", "secondary": "#0057b8", "accent": "#f2a900"},
+    "Footscray": {"primary": "#004b8d", "secondary": "#d71920", "accent": "#ffffff"},
+    "Fremantle": {"primary": "#2b1447", "secondary": "#ffffff", "accent": "#8b5fbf"},
+    "GW Sydney": {"primary": "#f15a22", "secondary": "#4a4a4a", "accent": "#ffffff"},
+    "Geelong": {"primary": "#002b5c", "secondary": "#ffffff", "accent": "#7db7e8"},
+    "Gold Coast": {"primary": "#d71920", "secondary": "#f2a900", "accent": "#ffffff"},
+    "Hawthorn": {"primary": "#4b2e19", "secondary": "#f2a900", "accent": "#d8c19c"},
+    "Kangaroos": {"primary": "#0b3b8c", "secondary": "#ffffff", "accent": "#8cc6ff"},
+    "Melbourne": {"primary": "#0f2340", "secondary": "#c8102e", "accent": "#7db7e8"},
+    "North Melbourne": {"primary": "#0b3b8c", "secondary": "#ffffff", "accent": "#8cc6ff"},
+    "Port Adelaide": {"primary": "#111111", "secondary": "#00a0df", "accent": "#ffffff"},
+    "Richmond": {"primary": "#111111", "secondary": "#f2c500", "accent": "#ffffff"},
+    "South Melbourne": {"primary": "#c8102e", "secondary": "#ffffff", "accent": "#7db7e8"},
+    "St Kilda": {"primary": "#111111", "secondary": "#d71920", "accent": "#ffffff"},
+    "Sydney": {"primary": "#c8102e", "secondary": "#ffffff", "accent": "#7db7e8"},
+    "University": {"primary": "#0f2340", "secondary": "#8cc6ff", "accent": "#ffffff"},
+    "West Coast": {"primary": "#002b5c", "secondary": "#f2a900", "accent": "#ffffff"},
+    "Western Bulldogs": {"primary": "#004b8d", "secondary": "#d71920", "accent": "#ffffff"},
+}
+
 
 def slugify(value: str) -> str:
     return (
@@ -130,6 +157,19 @@ def player_page_filename(player_key: str, player_label: str) -> str:
     if player_key.startswith("p:"):
         return f"{slugify(player_label)}-p{player_key.split(':', 1)[1]}.html"
     return f"{slugify(player_label)}-{slugify(player_key.replace(':', '-'))}.html"
+
+
+def team_theme_style(team_name: str | None) -> str:
+    if not team_name or team_name not in TEAM_THEMES:
+        return ""
+    theme = TEAM_THEMES[team_name]
+    primary = theme["primary"]
+    secondary = theme["secondary"]
+    accent = theme["accent"]
+    return (
+        ' style="--team-primary: {primary}; --team-secondary: {secondary}; '
+        '--team-accent: {accent};"'.format(primary=primary, secondary=secondary, accent=accent)
+    )
 
 
 def esc(value: object) -> str:
@@ -175,7 +215,7 @@ def aggregate_exprs(alias: str, games_expr: str) -> str:
     return ",\n                ".join(parts)
 
 
-def page_template(title: str, body: str, root_prefix: str, intro: str = "") -> str:
+def page_template(title: str, body: str, root_prefix: str, intro: str = "", page_class: str = "", body_style: str = "") -> str:
     nav = (
         f'<nav class="site-nav"><a href="{root_prefix}index.html">Home</a>'
         f'<a href="{root_prefix}teams/index.html">Teams</a>'
@@ -192,7 +232,7 @@ def page_template(title: str, body: str, root_prefix: str, intro: str = "") -> s
   <link rel="stylesheet" href="{root_prefix}style.css">
   <script defer src="{root_prefix}app.js"></script>
 </head>
-<body>
+<body class="{esc(page_class)}"{body_style}>
   <header class="site-header">
     <div class="header-inner">
       <h1>{esc(title)}</h1>
@@ -567,6 +607,8 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                     summary_body,
                     "../../",
                     intro=f"{team} seasonal totals and true team per-game averages.",
+                    page_class="team-page",
+                    body_style=team_theme_style(team),
                 ),
             )
 
@@ -590,6 +632,8 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                         player_body,
                         "../../",
                         intro=f"{team} player totals and per-game averages for {season}.",
+                        page_class="team-page",
+                        body_style=team_theme_style(team),
                     ),
                 )
 
