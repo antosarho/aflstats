@@ -1,0 +1,89 @@
+body {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.4;
+  color: #1f1f1f;
+  background: #f7f4ec;
+}
+
+header,
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem;
+}
+
+header {
+  border-bottom: 1px solid #c9bea7;
+  background: #efe5d0;
+}
+
+h1,
+h2 {
+  margin: 0 0 0.75rem;
+}
+
+nav {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+a {
+  color: #7a1f1f;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.summary {
+  padding-left: 1.25rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid #c9bea7;
+  background: #fffdf8;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #ddd3bd;
+  text-align: right;
+  white-space: nowrap;
+}
+
+th:first-child,
+td:first-child {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: #fffdf8;
+}
+
+thead th {
+  background: #e8dcc4;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+ul {
+  columns: 3 220px;
+  padding-left: 1.25rem;
+}
