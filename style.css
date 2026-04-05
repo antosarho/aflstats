@@ -124,6 +124,9 @@ a:hover {
 
 .player-hero {
   margin: 0 0 1rem;
+  float: right;
+  margin-left: 1rem;
+  margin-bottom: 1rem;
 }
 
 .club-badges-section {
@@ -177,6 +180,12 @@ a:hover {
   background: var(--panel);
   border: 1px solid var(--line-strong);
   box-shadow: 0 6px 16px var(--shadow);
+}
+
+body.player-page main::after {
+  content: "";
+  display: block;
+  clear: both;
 }
 
 .player-photo-frame {
@@ -549,6 +558,11 @@ tbody tr.is-filtered-out {
 
   .link-list {
     columns: 2 180px;
+  }
+
+  .player-hero {
+    float: none;
+    margin-left: 0;
   }
 }
 
