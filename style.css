@@ -81,6 +81,11 @@ main {
   padding: 1rem 1.25rem;
 }
 
+body.layout-wide .header-inner,
+body.layout-wide main {
+  max-width: none;
+}
+
 h1,
 h2 {
   margin: 0 0 0.75rem;
@@ -95,6 +100,7 @@ h2 {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 a {
@@ -106,6 +112,10 @@ a:hover {
   text-decoration: underline;
 }
 
+.layout-toggle {
+  margin-left: auto;
+}
+
 .columns {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -114,6 +124,48 @@ a:hover {
 
 .player-hero {
   margin: 0 0 1rem;
+}
+
+.club-badges-section {
+  margin: 0 0 1rem;
+}
+
+.club-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.club-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--badge-primary) 55%, white 45%);
+  background: color-mix(in srgb, var(--badge-secondary) 22%, white 78%);
+  color: var(--badge-primary);
+}
+
+.club-badge:hover {
+  text-decoration: none;
+}
+
+.club-badge-mark {
+  display: inline-flex;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  background: var(--badge-primary);
+  color: var(--badge-accent);
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.club-badge-name {
+  font-size: 0.92rem;
 }
 
 .player-photo-card {
@@ -179,6 +231,47 @@ a:hover {
   background: rgba(255, 253, 248, 0.96);
   border: 1px solid var(--line-strong);
   box-shadow: 0 8px 18px var(--shadow);
+}
+
+.table-filters {
+  width: 100%;
+}
+
+.table-filters summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-strong);
+}
+
+.table-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.8rem 1rem;
+  padding-top: 0.8rem;
+}
+
+.table-filters label,
+.table-filters .team-filter-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.wide-control {
+  grid-column: 1 / -1;
+}
+
+.team-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.35rem 0.75rem;
+  max-height: 10rem;
+  overflow: auto;
+  padding: 0.4rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
 }
 
 body.team-page .table-toolbar {
@@ -282,6 +375,32 @@ body.team-page .column-picker summary:hover {
   box-shadow: 0 6px 16px var(--shadow);
 }
 
+.table-shell-wide {
+  margin-left: calc(-1 * min(1.25rem, 2vw));
+  margin-right: calc(-1 * min(1.25rem, 2vw));
+}
+
+.table-summary {
+  padding: 0.55rem 0.75rem 0;
+}
+
+.summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.summary-chip {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  background: #f1e7d4;
+  border: 1px solid var(--line);
+  font-size: 0.88rem;
+}
+
 body.team-page .table-shell {
   border-color: color-mix(in srgb, var(--team-primary) 35%, var(--line-strong) 65%);
 }
@@ -324,6 +443,14 @@ table {
   width: max-content;
   min-width: 100%;
   font-size: 0.92rem;
+}
+
+.table-pagination {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
 }
 
 th,
@@ -414,6 +541,10 @@ tbody tr.is-filtered-out {
   .column-picker {
     margin-left: 0;
     width: 100%;
+  }
+
+  .layout-toggle {
+    margin-left: 0;
   }
 
   .link-list {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import json
 import sqlite3
 from collections import defaultdict
 from pathlib import Path
@@ -198,6 +199,10 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def write_json(path: Path, payload: object) -> None:
+    path.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+
+
 def query_rows(conn: sqlite3.Connection, sql: str, params: Iterable[object] = ()) -> list[dict]:
     conn.row_factory = sqlite3.Row
     return [dict(row) for row in conn.execute(sql, tuple(params))]
@@ -228,7 +233,8 @@ def page_template(
         f'<nav class="site-nav"><a href="{root_prefix}index.html">Home</a>'
         f'<a href="{root_prefix}teams/index.html">Teams</a>'
         f'<a href="{root_prefix}years/index.html">Years</a>'
-        f'<a href="{root_prefix}players/index.html">Players</a></nav>'
+        f'<a href="{root_prefix}players/index.html">Players</a>'
+        '<button type="button" class="layout-toggle" data-layout-toggle>Full width</button></nav>'
     )
     intro_block = f'<p class="page-intro">{intro}</p>' if intro else ""
     return f"""<!doctype html>
@@ -310,6 +316,8 @@ def stats_table(
     table_id: str,
     link_template: str | None = None,
     notes: str = "",
+    extra_controls: str = "",
+    table_kind: str = "",
 ) -> str:
     head_cells = [
         header_cell(label_title, label_title, f"Row label for this table.", "text", "label"),
@@ -357,24 +365,31 @@ def stats_table(
         body_rows.append("<tr>" + "".join(cells) + "</tr>")
 
     note_html = f'<p class="table-notes">{notes}</p>' if notes else ""
+    stat_names_json = esc(json.dumps([stat["name"] for stat in STAT_COLUMNS]))
     return (
         '<section class="table-section">'
         '<div class="table-toolbar">'
         f'<label class="table-filter">Filter rows <input type="search" placeholder="Type to filter..." data-table-filter="{table_id}"></label>'
         '<div class="table-toolbar-actions">'
+        f'<button type="button" data-table-width-toggle="{table_id}">Full width</button>'
+        f'<button type="button" data-stat-view-toggle="{table_id}" data-mode="both">Totals + averages</button>'
         f'<button type="button" data-columns-all="{table_id}">Show all columns</button>'
         f'<button type="button" data-columns-core="{table_id}">Core columns only</button>'
         "</div>"
+        f"{extra_controls}"
         f"{stat_picker_markup(table_id)}"
         "</div>"
         f'{note_html}<div class="table-shell" data-table-shell="{table_id}">'
+        f'<div class="table-summary" data-table-summary-top="{table_id}"></div>'
         '<div class="table-top-scroll" aria-hidden="true"><div class="table-top-scroll-inner"></div></div>'
         '<div class="table-wrap">'
-        f'<table class="stats-table" data-table-id="{table_id}">'
+        f'<table class="stats-table" data-table-id="{table_id}" data-table-kind="{table_kind}" data-page-size="1000" data-stat-names="{stat_names_json}">'
         f"<thead><tr>{''.join(head_cells)}</tr></thead>"
         f"<tbody>{''.join(body_rows)}</tbody>"
         "</table></div>"
+        f'<div class="table-pagination" data-table-pagination="{table_id}"></div>'
         '<div class="table-scroll-hint">Scroll sideways here. The top scrollbar stays above the table.</div>'
+        f'<div class="table-summary table-summary-bottom" data-table-summary-bottom="{table_id}"></div>'
         "</div></section>"
     )
 
@@ -396,6 +411,46 @@ def player_photo_markup(player_name: str) -> str:
         "</div>"
         "</section>"
     )
+
+
+def all_time_player_filters_markup(teams: list[str]) -> str:
+    team_options = "".join(
+        f'<label><input type="checkbox" data-alltime-team value="{esc(team)}">{esc(team)}</label>'
+        for team in teams
+    )
+    return (
+        '<details class="table-filters">'
+        '<summary>All-time filters</summary>'
+        '<div class="table-filters-grid">'
+        '<label>From year <input type="number" data-alltime-from placeholder="1897"></label>'
+        '<label>To year <input type="number" data-alltime-to placeholder="2026"></label>'
+        '<label class="wide-control">Exclude years '
+        '<input type="text" data-alltime-exclude placeholder="e.g. 2020,2021 or 1996-1999"></label>'
+        '<div class="wide-control team-filter-box"><span>Teams</span>'
+        f'<div class="team-filter-grid">{team_options}</div></div>'
+        '<div class="table-toolbar-actions">'
+        '<button type="button" data-alltime-clear>Clear filters</button>'
+        "</div></div></details>"
+    )
+
+
+def team_badge_markup(team_name: str, href: str) -> str:
+    theme = TEAM_THEMES.get(team_name, {"primary": "#333333", "secondary": "#dddddd", "accent": "#ffffff"})
+    initials = "".join(word[0] for word in team_name.replace("&", " ").split()[:2]).upper()
+    return (
+        f'<a class="club-badge" href="{href}" title="{esc(team_name)}" '
+        f'style="--badge-primary: {theme["primary"]}; --badge-secondary: {theme["secondary"]}; --badge-accent: {theme["accent"]};">'
+        f'<span class="club-badge-mark">{esc(initials)}</span><span class="club-badge-name">{esc(team_name)}</span></a>'
+    )
+
+
+def player_team_badges_markup(team_rows: list[dict]) -> str:
+    badges = "".join(
+        team_badge_markup(row["label"], f'../teams/{slugify(row["label"])}/index.html') for row in team_rows
+    )
+    if not badges:
+        return ""
+    return f'<section class="club-badges-section"><h2>Clubs</h2><div class="club-badges">{badges}</div></section>'
 
 
 def build_site(db_path: Path, out_dir: Path) -> None:
@@ -695,6 +750,7 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                 f"players-year-{season}",
                 link_template="../{player_file}",
                 notes="Per-game columns here are player totals divided by that player's games in the selected season.",
+                table_kind="player-season",
             )
             write_text(
                 out_dir / "players" / "years" / f"{season}.html",
@@ -709,6 +765,7 @@ def build_site(db_path: Path, out_dir: Path) -> None:
         player_all_time_rows = query_rows(conn, player_all_time_sql)
         for row in player_all_time_rows:
             row["player_file"] = player_page_filename(row["player_key"], row["label"])
+        player_file_by_key = {row["player_key"]: row["player_file"] for row in player_all_time_rows}
         player_all_time_body = stats_table(
             player_all_time_rows,
             "label",
@@ -716,6 +773,8 @@ def build_site(db_path: Path, out_dir: Path) -> None:
             "players-all-time",
             link_template="{player_file}",
             notes="Per-game columns here are career totals divided by career games in the database.",
+            extra_controls=all_time_player_filters_markup([row["team"] for row in team_rows]),
+            table_kind="alltime-player",
         )
         write_text(
             out_dir / "players" / "all-time.html",
@@ -759,6 +818,31 @@ def build_site(db_path: Path, out_dir: Path) -> None:
             row["team_season_file"] = f'../teams/{row["team_slug"]}/{row["season"]}.html'
             player_team_season_rows_by_key[row["player_key"]].append(row)
 
+        write_json(
+            out_dir / "players" / "all-time-filters.json",
+            {
+                "players": [
+                    {
+                        "player_key": row["player_key"],
+                        "label": row["label"],
+                        "player_file": row["player_file"],
+                    }
+                    for row in player_all_time_rows
+                ],
+                "splits": [
+                    {
+                        "player_key": row["player_key"],
+                        "season": row["season"],
+                        "team": row["team"],
+                        "games": row["games"],
+                        **{f'{stat["name"]}_total': row[f'{stat["name"]}_total'] for stat in STAT_COLUMNS},
+                    }
+                    for rows in player_team_season_rows_by_key.values()
+                    for row in rows
+                ],
+            },
+        )
+
         for player_row in player_all_time_rows:
             player_key = player_row["player_key"]
             player_name = player_row["label"]
@@ -779,6 +863,7 @@ def build_site(db_path: Path, out_dir: Path) -> None:
 
             body = (
                 player_photo_markup(player_name)
+                + player_team_badges_markup(team_rows)
                 + '<ul class="summary">' + "".join(f"<li>{item}</li>" for item in summary_items) + "</ul>"
             )
             if meta.get("career_summary"):
