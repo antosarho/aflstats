@@ -457,6 +457,7 @@ def build_site(db_path: Path, out_dir: Path) -> None:
     ensure_dir(out_dir / "teams")
     ensure_dir(out_dir / "years")
     ensure_dir(out_dir / "players")
+    ensure_dir(out_dir / "players" / "clubs")
     ensure_dir(out_dir / "players" / "years")
 
     conn = sqlite3.connect(db_path)
@@ -518,16 +519,27 @@ def build_site(db_path: Path, out_dir: Path) -> None:
         )
 
         player_year_index_items = [(str(row["season"]), f'{row["season"]}.html') for row in season_rows]
+        player_club_index_items = [(row["team"], f'{slugify(row["team"])}.html') for row in team_rows]
         write_text(
             out_dir / "players" / "index.html",
             page_template(
                 "Players",
                 '<ul class="link-list">'
                 '<li><a href="all-time.html">All-time player totals and per-game averages</a></li>'
+                '<li><a href="clubs/index.html">All-time player stats by club</a></li>'
                 '<li><a href="years/index.html">Player leaderboards by season</a></li>'
                 "</ul>",
                 "../",
                 intro="Sortable player leaderboards across all teams, with every raw total and per-game rate in one place. Click a player name from a table to open that player's page.",
+            ),
+        )
+        write_text(
+            out_dir / "players" / "clubs" / "index.html",
+            page_template(
+                "Player Clubs",
+                list_page(player_club_index_items, "Player Clubs"),
+                "../../",
+                intro="Browse all-time player leaderboards for each club.",
             ),
         )
         write_text(
@@ -606,6 +618,18 @@ def build_site(db_path: Path, out_dir: Path) -> None:
             FROM player_appearance_details pad
             LEFT JOIN players p ON p.id = pad.player_id
             WHERE pad.season = ?
+            GROUP BY player_key, label
+            ORDER BY disposals_total DESC, games DESC, label
+        """
+
+        player_club_all_time_sql = f"""
+            SELECT
+                {player_identity_select},
+                COUNT(*) AS games,
+                {aggregate_exprs('pad', 'COUNT(*)')}
+            FROM player_appearance_details pad
+            LEFT JOIN players p ON p.id = pad.player_id
+            WHERE pad.team = ?
             GROUP BY player_key, label
             ORDER BY disposals_total DESC, games DESC, label
         """
@@ -758,6 +782,33 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                     player_year_body,
                     "../../",
                     intro=f"League-wide player totals and per-game averages for {season}.",
+                ),
+            )
+
+        for team_row in team_rows:
+            team = team_row["team"]
+            team_slug = slugify(team)
+            club_player_rows = query_rows(conn, player_club_all_time_sql, (team,))
+            for row in club_player_rows:
+                row["player_file"] = f'../{player_page_filename(row["player_key"], row["label"])}'
+            club_body = stats_table(
+                club_player_rows,
+                "label",
+                "Player",
+                f"players-club-{team_slug}",
+                link_template="{player_file}",
+                notes=f"Per-game columns here are totals divided by games played for {team}.",
+                table_kind="player-club",
+            )
+            write_text(
+                out_dir / "players" / "clubs" / f"{team_slug}.html",
+                page_template(
+                    f"{team} All-time Player Stats",
+                    club_body,
+                    "../../",
+                    intro=f"All-time player totals and per-game averages for {team}.",
+                    page_class="team-page",
+                    body_style=team_theme_style(team),
                 ),
             )
 
