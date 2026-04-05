@@ -215,7 +215,15 @@ def aggregate_exprs(alias: str, games_expr: str) -> str:
     return ",\n                ".join(parts)
 
 
-def page_template(title: str, body: str, root_prefix: str, intro: str = "", page_class: str = "", body_style: str = "") -> str:
+def page_template(
+    title: str,
+    body: str,
+    root_prefix: str,
+    intro: str = "",
+    page_class: str = "",
+    body_style: str = "",
+    body_attrs: str = "",
+) -> str:
     nav = (
         f'<nav class="site-nav"><a href="{root_prefix}index.html">Home</a>'
         f'<a href="{root_prefix}teams/index.html">Teams</a>'
@@ -232,7 +240,7 @@ def page_template(title: str, body: str, root_prefix: str, intro: str = "", page
   <link rel="stylesheet" href="{root_prefix}style.css">
   <script defer src="{root_prefix}app.js"></script>
 </head>
-<body class="{esc(page_class)}"{body_style}>
+<body class="{esc(page_class)}"{body_style}{body_attrs}>
   <header class="site-header">
     <div class="header-inner">
       <h1>{esc(title)}</h1>
@@ -373,6 +381,21 @@ def stats_table(
 
 def section(title: str, body: str) -> str:
     return f"<section><h2>{esc(title)}</h2>{body}</section>"
+
+
+def player_photo_markup(player_name: str) -> str:
+    return (
+        '<section class="player-hero">'
+        '<div class="player-photo-card" data-player-photo>'
+        f'<div class="player-photo-frame" data-player-photo-frame data-player-name="{esc(player_name)}">'
+        '<div class="player-photo-placeholder">Searching Wikimedia Commons for a public-domain photo...</div>'
+        "</div>"
+        '<p class="player-photo-meta" data-player-photo-meta>'
+        "A small public-domain photo will appear here when Wikimedia Commons returns a match."
+        "</p>"
+        "</div>"
+        "</section>"
+    )
 
 
 def build_site(db_path: Path, out_dir: Path) -> None:
@@ -755,7 +778,8 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                 summary_items.append(f"Weight: {esc(meta['weight_kg'])} kg")
 
             body = (
-                '<ul class="summary">' + "".join(f"<li>{item}</li>" for item in summary_items) + "</ul>"
+                player_photo_markup(player_name)
+                + '<ul class="summary">' + "".join(f"<li>{item}</li>" for item in summary_items) + "</ul>"
             )
             if meta.get("career_summary"):
                 body += f'<p>{esc(meta["career_summary"])}</p>'
@@ -810,6 +834,7 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                     body,
                     "../",
                     intro=f"Individual career, season, and team breakdowns for {player_name}.",
+                    page_class="player-page",
                 ),
             )
     finally:
