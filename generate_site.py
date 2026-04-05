@@ -483,6 +483,7 @@ def build_site(db_path: Path, out_dir: Path) -> None:
             '<div><h2>Player Leaderboards</h2>'
             '<ul class="link-list">'
             '<li><a href="players/all-time.html">All-time player stats</a></li>'
+            '<li><a href="players/clubs/index.html">All-time player stats by club</a></li>'
             '<li><a href="players/years/index.html">Player stats by season</a></li>'
             "</ul></div></section>"
         )

@@ -301,6 +301,7 @@
             this.sortKey = key;
             this.sortDirection = key === "label" ? "asc" : "desc";
           }
+          this.currentPage = 1;
           writeStorage(storageKey(this.tableId, "sort-key"), this.sortKey);
           writeStorage(storageKey(this.tableId, "sort-direction"), this.sortDirection);
           this.render();
