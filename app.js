@@ -229,9 +229,11 @@
     const htmlByKey = {};
     const displayByKey = {};
     const sortByKey = {};
-    htmlByKey.label = `<a href="${player.player_file}">${player.label}</a>`;
-    displayByKey.label = player.label;
-    sortByKey.label = player.label.toLowerCase();
+    const displayLabel = player.display_label || player.label;
+    const sortLabel = player.label_sort || displayLabel.toLowerCase();
+    htmlByKey.label = `<a href="${player.player_file}">${displayLabel}</a>`;
+    displayByKey.label = displayLabel;
+    sortByKey.label = sortLabel;
     htmlByKey.games = String(stats.games);
     displayByKey.games = String(stats.games);
     sortByKey.games = stats.games;
@@ -250,7 +252,7 @@
       htmlByKey,
       displayByKey,
       sortByKey,
-      searchText: player.label.toLowerCase(),
+      searchText: `${displayLabel} ${player.label}`.toLowerCase(),
     };
   }
 

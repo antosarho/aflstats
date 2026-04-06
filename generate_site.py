@@ -160,6 +160,27 @@ def player_page_filename(player_key: str, player_label: str) -> str:
     return f"{slugify(player_label)}-{slugify(player_key.replace(':', '-'))}.html"
 
 
+def format_player_name(player_name: str) -> str:
+    parts = player_name.split()
+    if len(parts) <= 1:
+        return player_name
+    surname = parts[-1]
+    given_names = " ".join(parts[:-1])
+    return f"{surname}, {given_names}"
+
+
+def player_sort_key(player_name: str) -> str:
+    return format_player_name(player_name).lower()
+
+
+def decorate_player_row(row: dict) -> dict:
+    canonical_name = str(row["label"])
+    row["canonical_name"] = canonical_name
+    row["display_label"] = format_player_name(canonical_name)
+    row["label_sort"] = player_sort_key(canonical_name)
+    return row
+
+
 def team_theme_style(team_name: str | None) -> str:
     if not team_name or team_name not in TEAM_THEMES:
         return ""
@@ -302,10 +323,11 @@ def header_cell(label: str, title: str, description: str, sort_type: str, col_ke
 
 
 def label_cell(row: dict, label_key: str, link_template: str | None) -> str:
-    label = esc(row[label_key])
+    label_value = row.get("display_label", row[label_key])
+    label = esc(label_value)
     if link_template:
         label = f'<a href="{link_template.format(**row)}">{label}</a>'
-    sort_value = esc(str(row[label_key]).lower())
+    sort_value = esc(str(row.get("label_sort", label_value)).lower())
     return f'<td data-col-key="label" data-sort-value="{sort_value}">{label}</td>'
 
 
@@ -718,7 +740,9 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                 season = row["season"]
                 player_rows = query_rows(conn, team_year_sql, (team, season))
                 for player_row in player_rows:
+                    decorate_player_row(player_row)
                     player_row["player_file"] = f'../../players/{player_page_filename(player_row["player_key"], player_row["label"])}'
+                player_rows.sort(key=lambda row: (row["label_sort"], str(row["label"]).lower()))
                 player_body = stats_table(
                     player_rows,
                     "label",
@@ -766,7 +790,9 @@ def build_site(db_path: Path, out_dir: Path) -> None:
 
             player_year_rows = query_rows(conn, player_year_sql, (season,))
             for row in player_year_rows:
+                decorate_player_row(row)
                 row["player_file"] = player_page_filename(row["player_key"], row["label"])
+            player_year_rows.sort(key=lambda row: (row["label_sort"], str(row["label"]).lower()))
             player_year_body = stats_table(
                 player_year_rows,
                 "label",
@@ -791,7 +817,9 @@ def build_site(db_path: Path, out_dir: Path) -> None:
             team_slug = slugify(team)
             club_player_rows = query_rows(conn, player_club_all_time_sql, (team,))
             for row in club_player_rows:
+                decorate_player_row(row)
                 row["player_file"] = f'../{player_page_filename(row["player_key"], row["label"])}'
+            club_player_rows.sort(key=lambda row: (row["label_sort"], str(row["label"]).lower()))
             club_body = stats_table(
                 club_player_rows,
                 "label",
@@ -815,7 +843,9 @@ def build_site(db_path: Path, out_dir: Path) -> None:
 
         player_all_time_rows = query_rows(conn, player_all_time_sql)
         for row in player_all_time_rows:
+            decorate_player_row(row)
             row["player_file"] = player_page_filename(row["player_key"], row["label"])
+        player_all_time_rows.sort(key=lambda row: (row["label_sort"], str(row["label"]).lower()))
         player_file_by_key = {row["player_key"]: row["player_file"] for row in player_all_time_rows}
         player_all_time_body = stats_table(
             player_all_time_rows,
@@ -876,6 +906,8 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                     {
                         "player_key": row["player_key"],
                         "label": row["label"],
+                        "display_label": row["display_label"],
+                        "label_sort": row["label_sort"],
                         "player_file": row["player_file"],
                     }
                     for row in player_all_time_rows
@@ -896,7 +928,8 @@ def build_site(db_path: Path, out_dir: Path) -> None:
 
         for player_row in player_all_time_rows:
             player_key = player_row["player_key"]
-            player_name = player_row["label"]
+            player_name = player_row["display_label"]
+            canonical_player_name = player_row["canonical_name"]
             player_file = player_row["player_file"]
 
             season_rows = player_season_rows_by_key.get(player_key, [])
@@ -913,7 +946,7 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                 summary_items.append(f"Weight: {esc(meta['weight_kg'])} kg")
 
             body = (
-                player_photo_markup(player_name)
+                player_photo_markup(canonical_player_name)
                 + player_team_badges_markup(team_rows)
                 + '<ul class="summary">' + "".join(f"<li>{item}</li>" for item in summary_items) + "</ul>"
             )
