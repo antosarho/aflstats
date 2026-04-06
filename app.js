@@ -1,6 +1,11 @@
 (function () {
   const STORAGE_PREFIX = "aflstats:";
   const COMMONS_API = "https://commons.wikimedia.org/w/api.php";
+  const PREFERENCE_KEYS = {
+    nameFormat: `${STORAGE_PREFIX}name-format`,
+    layout: `${STORAGE_PREFIX}layout-wide`,
+    fontSize: `${STORAGE_PREFIX}font-size`,
+  };
 
   function storageKey(tableId, suffix) {
     return `${STORAGE_PREFIX}${suffix}:${tableId}`;
@@ -17,6 +22,34 @@
 
   function writeStorage(key, value) {
     window.localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function updatePlayerNameDisplays() {
+    const format = readStorage(PREFERENCE_KEYS.nameFormat, "surname");
+    document.body.dataset.nameFormat = format;
+    document.querySelectorAll("[data-player-name-display]").forEach((node) => {
+      node.textContent =
+        format === "given" ? node.getAttribute("data-name-given") || "" : node.getAttribute("data-name-surname") || "";
+    });
+    document.querySelectorAll("[data-name-format-select]").forEach((select) => {
+      select.value = format;
+    });
+  }
+
+  function updateLayoutPreference() {
+    const wide = readStorage(PREFERENCE_KEYS.layout, false);
+    document.body.classList.toggle("layout-wide", wide);
+    document.querySelectorAll("[data-layout-select]").forEach((select) => {
+      select.value = wide ? "wide" : "narrow";
+    });
+  }
+
+  function updateFontSizePreference() {
+    const fontSize = readStorage(PREFERENCE_KEYS.fontSize, "medium");
+    document.body.dataset.fontSize = fontSize;
+    document.querySelectorAll("[data-font-size-select]").forEach((select) => {
+      select.value = fontSize;
+    });
   }
 
   function parseNumeric(value) {
@@ -231,7 +264,10 @@
     const sortByKey = {};
     const displayLabel = player.display_label || player.label;
     const sortLabel = player.label_sort || displayLabel.toLowerCase();
-    htmlByKey.label = `<a href="${player.player_file}">${displayLabel}</a>`;
+    htmlByKey.label =
+      `<a href="${player.player_file}">` +
+      `<span data-player-name-display data-name-surname="${displayLabel.replace(/"/g, "&quot;")}" data-name-given="${player.label.replace(/"/g, "&quot;")}">${displayLabel}</span>` +
+      `</a>`;
     displayByKey.label = displayLabel;
     sortByKey.label = sortLabel;
     htmlByKey.games = String(stats.games);
@@ -275,8 +311,14 @@
       this.viewMode = readStorage(storageKey(this.tableId, "view-mode"), "both");
       this.fullWidth = readStorage(storageKey(this.tableId, "table-width"), false);
       this.currentPage = readStorage(storageKey(this.tableId, "page"), 1);
-      this.sortKey = readStorage(storageKey(this.tableId, "sort-key"), "label");
-      this.sortDirection = readStorage(storageKey(this.tableId, "sort-direction"), "asc");
+      this.sortKey = readStorage(
+        storageKey(this.tableId, "sort-key"),
+        this.table.getAttribute("data-default-sort-key") || "label"
+      );
+      this.sortDirection = readStorage(
+        storageKey(this.tableId, "sort-direction"),
+        this.table.getAttribute("data-default-sort-direction") || "asc"
+      );
       this.rowModels = [...this.tbody.querySelectorAll("tr")].map((tr) => createRowModelFromDom(tr, this.columnKeys));
       this.filteredRows = [...this.rowModels];
       this.allTimeData = null;
@@ -526,6 +568,7 @@
       this.applyColumnVisibility();
       this.renderPagination(this.filteredRows.length);
       this.renderSummaries();
+      updatePlayerNameDisplays();
       const wrap = this.shell.querySelector(".table-wrap");
       if (wrap) {
         const topInner = this.shell.querySelector(".table-top-scroll-inner");
@@ -645,26 +688,31 @@
     }
   }
 
-  function setupGlobalLayoutToggle() {
-    const key = `${STORAGE_PREFIX}layout-wide`;
-    let wide = readStorage(key, false);
-    const apply = () => {
-      document.body.classList.toggle("layout-wide", wide);
-      document.querySelectorAll("[data-layout-toggle]").forEach((button) => {
-        button.textContent = wide ? "Narrow width" : "Full width";
-      });
-    };
-    document.querySelectorAll("[data-layout-toggle]").forEach((button) => {
-      button.addEventListener("click", () => {
-        wide = !wide;
-        writeStorage(key, wide);
-        apply();
+  function setupGlobalPreferences() {
+    document.querySelectorAll("[data-name-format-select]").forEach((select) => {
+      select.addEventListener("change", () => {
+        writeStorage(PREFERENCE_KEYS.nameFormat, select.value);
+        updatePlayerNameDisplays();
       });
     });
-    apply();
+    document.querySelectorAll("[data-layout-select]").forEach((select) => {
+      select.addEventListener("change", () => {
+        writeStorage(PREFERENCE_KEYS.layout, select.value === "wide");
+        updateLayoutPreference();
+      });
+    });
+    document.querySelectorAll("[data-font-size-select]").forEach((select) => {
+      select.addEventListener("change", () => {
+        writeStorage(PREFERENCE_KEYS.fontSize, select.value);
+        updateFontSizePreference();
+      });
+    });
+    updatePlayerNameDisplays();
+    updateLayoutPreference();
+    updateFontSizePreference();
   }
 
-  setupGlobalLayoutToggle();
+  setupGlobalPreferences();
 
   document.querySelectorAll(".table-shell").forEach((shell) => {
     new StatsTableController(shell);

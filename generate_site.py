@@ -160,6 +160,10 @@ def player_page_filename(player_key: str, player_label: str) -> str:
     return f"{slugify(player_label)}-{slugify(player_key.replace(':', '-'))}.html"
 
 
+def game_page_filename(source_game_no: int) -> str:
+    return f"g{source_game_no}.html"
+
+
 def format_player_name(player_name: str) -> str:
     parts = player_name.split()
     if len(parts) <= 1:
@@ -177,8 +181,20 @@ def decorate_player_row(row: dict) -> dict:
     canonical_name = str(row["label"])
     row["canonical_name"] = canonical_name
     row["display_label"] = format_player_name(canonical_name)
+    row["alternate_label"] = canonical_name
     row["label_sort"] = player_sort_key(canonical_name)
     return row
+
+
+def player_name_markup(player_name: str, display_value: str | None = None, class_name: str = "") -> str:
+    attrs = [
+        'data-player-name-display',
+        f'data-name-surname="{esc(format_player_name(player_name))}"',
+        f'data-name-given="{esc(player_name)}"',
+    ]
+    if class_name:
+        attrs.append(f'class="{esc(class_name)}"')
+    return f'<span {" ".join(attrs)}>{esc(display_value or format_player_name(player_name))}</span>'
 
 
 def team_theme_style(team_name: str | None) -> str:
@@ -241,6 +257,15 @@ def aggregate_exprs(alias: str, games_expr: str) -> str:
     return ",\n                ".join(parts)
 
 
+def per_game_exprs(alias: str) -> str:
+    parts = []
+    for stat in STAT_COLUMNS:
+        stat_name = stat["name"]
+        parts.append(f"COALESCE({alias}.{stat_name}, 0) AS {stat_name}_total")
+        parts.append(f"COALESCE({alias}.{stat_name}, 0) AS {stat_name}_avg")
+    return ",\n                ".join(parts)
+
+
 def page_template(
     title: str,
     body: str,
@@ -249,15 +274,38 @@ def page_template(
     page_class: str = "",
     body_style: str = "",
     body_attrs: str = "",
+    heading_html: str | None = None,
+    intro_html: str | None = None,
 ) -> str:
+    settings = (
+        '<div class="site-settings">'
+        '<label class="site-setting">Names '
+        '<select data-name-format-select>'
+        '<option value="surname">Surname, Firstname</option>'
+        '<option value="given">Firstname Surname</option>'
+        '</select></label>'
+        '<label class="site-setting">Width '
+        '<select data-layout-select>'
+        '<option value="narrow">Narrow</option>'
+        '<option value="wide">Full width</option>'
+        '</select></label>'
+        '<label class="site-setting">Font size '
+        '<select data-font-size-select>'
+        '<option value="small">Small</option>'
+        '<option value="medium">Medium</option>'
+        '<option value="large">Large</option>'
+        '</select></label>'
+        '</div>'
+    )
     nav = (
         f'<nav class="site-nav"><a href="{root_prefix}index.html">Home</a>'
         f'<a href="{root_prefix}teams/index.html">Teams</a>'
         f'<a href="{root_prefix}years/index.html">Years</a>'
         f'<a href="{root_prefix}players/index.html">Players</a>'
-        '<button type="button" class="layout-toggle" data-layout-toggle>Full width</button></nav>'
+        f'<a href="{root_prefix}games/index.html">Games</a>'
+        f"{settings}</nav>"
     )
-    intro_block = f'<p class="page-intro">{intro}</p>' if intro else ""
+    intro_block = f'<p class="page-intro">{intro_html or esc(intro)}</p>' if (intro or intro_html) else ""
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -270,7 +318,7 @@ def page_template(
 <body class="{esc(page_class)}"{body_style}{body_attrs}>
   <header class="site-header">
     <div class="header-inner">
-      <h1>{esc(title)}</h1>
+      <h1>{heading_html or esc(title)}</h1>
       {nav}
       {intro_block}
     </div>
@@ -324,7 +372,10 @@ def header_cell(label: str, title: str, description: str, sort_type: str, col_ke
 
 def label_cell(row: dict, label_key: str, link_template: str | None) -> str:
     label_value = row.get("display_label", row[label_key])
-    label = esc(label_value)
+    if row.get("canonical_name"):
+        label = player_name_markup(str(row["canonical_name"]), str(label_value))
+    else:
+        label = esc(label_value)
     if link_template:
         label = f'<a href="{link_template.format(**row)}">{label}</a>'
     sort_value = esc(str(row.get("label_sort", label_value)).lower())
@@ -340,6 +391,8 @@ def stats_table(
     notes: str = "",
     extra_controls: str = "",
     table_kind: str = "",
+    default_sort_key: str = "label",
+    default_sort_direction: str = "asc",
 ) -> str:
     head_cells = [
         header_cell(label_title, label_title, f"Row label for this table.", "text", "label"),
@@ -404,7 +457,7 @@ def stats_table(
         f'<div class="table-summary" data-table-summary-top="{table_id}"></div>'
         '<div class="table-top-scroll" aria-hidden="true"><div class="table-top-scroll-inner"></div></div>'
         '<div class="table-wrap">'
-        f'<table class="stats-table" data-table-id="{table_id}" data-table-kind="{table_kind}" data-page-size="1000" data-stat-names="{stat_names_json}">'
+        f'<table class="stats-table" data-table-id="{table_id}" data-table-kind="{table_kind}" data-page-size="1000" data-stat-names="{stat_names_json}" data-default-sort-key="{esc(default_sort_key)}" data-default-sort-direction="{esc(default_sort_direction)}">'
         f"<thead><tr>{''.join(head_cells)}</tr></thead>"
         f"<tbody>{''.join(body_rows)}</tbody>"
         "</table></div>"
@@ -474,6 +527,28 @@ def player_team_badges_markup(team_rows: list[dict]) -> str:
     return f'<section class="club-badges-section"><h2>Clubs</h2><div class="club-badges">{badges}</div></section>'
 
 
+def game_result_summary(row: dict) -> str:
+    if row.get("is_draw"):
+        return f"Drawn {row['team1_score']} to {row['team2_score']}"
+    winner = row.get("winner") or "Unknown"
+    loser = row["team2"] if winner == row["team1"] else row["team1"]
+    winner_score = row["team1_score"] if winner == row["team1"] else row["team2_score"]
+    loser_score = row["team2_score"] if loser == row["team2"] else row["team1_score"]
+    return f"{winner} def. {loser} by {row['margin']} ({winner_score} to {loser_score})"
+
+
+def game_link_label(row: dict) -> str:
+    return f"{row['game_date']} · {row['team1']} vs {row['team2']}"
+
+
+def player_game_label(row: dict, game_row: dict) -> str:
+    if game_row.get("is_draw"):
+        outcome = "Drew"
+    else:
+        outcome = "Won" if game_row.get("winner") == row["team"] else "Lost"
+    return f"{row['game_date']} · {row['team']} vs {row['opponent']} · {outcome} · {game_row['team1_score']}-{game_row['team2_score']}"
+
+
 def build_site(db_path: Path, out_dir: Path) -> None:
     ensure_dir(out_dir)
     ensure_dir(out_dir / "teams")
@@ -481,6 +556,7 @@ def build_site(db_path: Path, out_dir: Path) -> None:
     ensure_dir(out_dir / "players")
     ensure_dir(out_dir / "players" / "clubs")
     ensure_dir(out_dir / "players" / "years")
+    ensure_dir(out_dir / "games")
 
     conn = sqlite3.connect(db_path)
     try:
@@ -488,20 +564,24 @@ def build_site(db_path: Path, out_dir: Path) -> None:
         team_rows = query_rows(conn, "SELECT DISTINCT name AS team FROM teams ORDER BY name")
         player_game_count = query_rows(conn, "SELECT COUNT(*) AS n FROM player_appearances")[0]["n"]
         player_count = query_rows(conn, "SELECT COUNT(*) AS n FROM players")[0]["n"]
+        game_count = query_rows(conn, "SELECT COUNT(*) AS n FROM games")[0]["n"]
 
         home_team_links = [(row["team"], f'teams/{slugify(row["team"])}/index.html') for row in team_rows]
         home_year_links = [(str(row["season"]), f'years/{row["season"]}.html') for row in season_rows]
+        home_game_links = [(str(row["season"]), f'games/{row["season"]}.html') for row in season_rows]
 
         home_body = (
             '<section><ul class="summary">'
             f"<li>Teams: {len(team_rows)}</li>"
             f"<li>Seasons: {len(season_rows)}</li>"
+            f"<li>Games: {game_count}</li>"
             f"<li>Players: {player_count}</li>"
             f"<li>Player appearances: {player_game_count}</li>"
             "</ul></section>"
             '<section class="columns">'
             f"<div><h2>Browse Teams</h2>{list_page(home_team_links, 'Teams')}</div>"
             f"<div><h2>Browse Years</h2>{list_page(home_year_links, 'Years')}</div>"
+            f"<div><h2>Browse Games</h2>{list_page(home_game_links, 'Games')}</div>"
             '<div><h2>Player Leaderboards</h2>'
             '<ul class="link-list">'
             '<li><a href="players/all-time.html">All-time player stats</a></li>'
@@ -538,6 +618,17 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                 list_page(year_index_items, "Years"),
                 "../",
                 intro="Browse each season to compare team totals and true team per-game averages.",
+            ),
+        )
+
+        game_index_items = [(str(row["season"]), f'{row["season"]}.html') for row in season_rows]
+        write_text(
+            out_dir / "games" / "index.html",
+            page_template(
+                "Games",
+                list_page(game_index_items, "Games"),
+                "../",
+                intro="Browse every game by season, then open a match page for player-by-player stat lines and the final result.",
             ),
         )
 
@@ -705,6 +796,85 @@ def build_site(db_path: Path, out_dir: Path) -> None:
             ORDER BY player_key, pad.season DESC, games DESC, pad.team
         """
 
+        player_game_sql = f"""
+            SELECT
+                CASE
+                    WHEN p.id IS NOT NULL THEN 'p:' || p.id
+                    ELSE 'n:' || pad.player_name
+                END AS player_key,
+                pad.game_id,
+                pad.source_game_no,
+                pad.game_date,
+                pad.season,
+                pad.round_name,
+                pad.team,
+                pad.opponent,
+                pad.venue,
+                1 AS games,
+                {aggregate_exprs('pad', 'COUNT(*)')}
+            FROM player_appearance_details pad
+            LEFT JOIN players p ON p.id = pad.player_id
+            GROUP BY player_key, pad.game_id
+            ORDER BY player_key, pad.game_date DESC, pad.source_game_no DESC
+        """
+
+        game_page_summary_sql = """
+            SELECT
+                id,
+                source_game_no,
+                game_date,
+                season,
+                round_name,
+                venue,
+                team1,
+                team1_score,
+                team2,
+                team2_score,
+                winner,
+                margin,
+                is_draw
+            FROM game_details
+            WHERE id = ?
+        """
+
+        game_player_sql = f"""
+            SELECT
+                CASE
+                    WHEN p.id IS NOT NULL THEN 'p:' || p.id
+                    ELSE 'n:' || pad.player_name
+                END AS player_key,
+                COALESCE(p.name, pad.player_name) AS label,
+                pad.team,
+                pad.team_slot,
+                pad.team_player_order,
+                1 AS games,
+                {per_game_exprs('pad')}
+            FROM player_appearance_details pad
+            LEFT JOIN players p ON p.id = pad.player_id
+            WHERE pad.game_id = ?
+            ORDER BY pad.team_slot, pad.team_player_order
+        """
+
+        games_by_season_sql = """
+            SELECT
+                id,
+                source_game_no,
+                game_date,
+                season,
+                round_name,
+                venue,
+                team1,
+                team1_score,
+                team2,
+                team2_score,
+                winner,
+                margin,
+                is_draw
+            FROM game_details
+            WHERE season = ?
+            ORDER BY game_date DESC, source_game_no DESC
+        """
+
         for team_row in team_rows:
             team = team_row["team"]
             team_slug = slugify(team)
@@ -763,6 +933,8 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                     ),
                 )
 
+        game_rows_by_id: dict[int, dict] = {}
+
         for season_row in season_rows:
             season = season_row["season"]
             season_rows_data = query_rows(conn, year_summary_sql, (season,))
@@ -785,6 +957,27 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                     year_body,
                     "../",
                     intro=f"Team totals and true team per-game averages for the {season} season.",
+                ),
+            )
+
+            season_game_rows = query_rows(conn, games_by_season_sql, (season,))
+            for row in season_game_rows:
+                row["game_file"] = game_page_filename(row["source_game_no"])
+                game_rows_by_id[row["id"]] = row
+            season_game_items = [
+                (
+                    f"{game_link_label(row)} · {game_result_summary(row)} · {row['round_name']} · {row['venue']}",
+                    row["game_file"],
+                )
+                for row in season_game_rows
+            ]
+            write_text(
+                out_dir / "games" / f"{season}.html",
+                page_template(
+                    f"{season} Games",
+                    list_page(season_game_items, f"{season} Games"),
+                    "../",
+                    intro=f"Every recorded game for {season}, with final scores and links to full player stat pages.",
                 ),
             )
 
@@ -899,6 +1092,16 @@ def build_site(db_path: Path, out_dir: Path) -> None:
             row["team_season_file"] = f'../teams/{row["team_slug"]}/{row["season"]}.html'
             player_team_season_rows_by_key[row["player_key"]].append(row)
 
+        player_game_rows_by_key: dict[str, list[dict]] = defaultdict(list)
+        for row in query_rows(conn, player_game_sql):
+            game_row = game_rows_by_id.get(row["game_id"])
+            if not game_row:
+                continue
+            row["label"] = player_game_label(row, game_row)
+            row["label_sort"] = f"{row['game_date']}:{row['source_game_no']:06d}"
+            row["game_file"] = f"../games/{game_page_filename(row['source_game_no'])}"
+            player_game_rows_by_key[row["player_key"]].append(row)
+
         write_json(
             out_dir / "players" / "all-time-filters.json",
             {
@@ -926,6 +1129,62 @@ def build_site(db_path: Path, out_dir: Path) -> None:
             },
         )
 
+        for game_row in game_rows_by_id.values():
+            player_rows = query_rows(conn, game_player_sql, (game_row["id"],))
+            team1_rows: list[dict] = []
+            team2_rows: list[dict] = []
+            for row in player_rows:
+                decorate_player_row(row)
+                row["player_file"] = f'../players/{player_page_filename(row["player_key"], row["label"])}'
+                if row["team_slot"] == 1:
+                    team1_rows.append(row)
+                else:
+                    team2_rows.append(row)
+
+            body = (
+                '<ul class="summary">'
+                f"<li>Date: {esc(game_row['game_date'])}</li>"
+                f"<li>Round: {esc(game_row['round_name'])}</li>"
+                f"<li>Venue: {esc(game_row['venue'])}</li>"
+                f"<li>Result: {esc(game_result_summary(game_row))}</li>"
+                "</ul>"
+            )
+            body += section(
+                f"{game_row['team1']} Player Stats",
+                stats_table(
+                    team1_rows,
+                    "label",
+                    "Player",
+                    f"game-{game_row['source_game_no']}-team1",
+                    link_template="{player_file}",
+                    notes=f"{game_row['team1']} player stat line for this game.",
+                    default_sort_key="label",
+                    default_sort_direction="asc",
+                ),
+            )
+            body += section(
+                f"{game_row['team2']} Player Stats",
+                stats_table(
+                    team2_rows,
+                    "label",
+                    "Player",
+                    f"game-{game_row['source_game_no']}-team2",
+                    link_template="{player_file}",
+                    notes=f"{game_row['team2']} player stat line for this game.",
+                    default_sort_key="label",
+                    default_sort_direction="asc",
+                ),
+            )
+            write_text(
+                out_dir / "games" / game_page_filename(game_row["source_game_no"]),
+                page_template(
+                    f"{game_row['team1']} vs {game_row['team2']} · {game_row['game_date']}",
+                    body,
+                    "../",
+                    intro=f"{game_result_summary(game_row)} · {game_row['round_name']} at {game_row['venue']}.",
+                ),
+            )
+
         for player_row in player_all_time_rows:
             player_key = player_row["player_key"]
             player_name = player_row["display_label"]
@@ -935,6 +1194,7 @@ def build_site(db_path: Path, out_dir: Path) -> None:
             season_rows = player_season_rows_by_key.get(player_key, [])
             team_rows = player_team_rows_by_key.get(player_key, [])
             team_season_rows = player_team_season_rows_by_key.get(player_key, [])
+            game_rows = player_game_rows_by_key.get(player_key, [])
 
             meta = player_meta_by_key.get(player_key, {})
             summary_items = [f"Career games in DB: {esc(player_row['games'])}"]
@@ -995,6 +1255,19 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                     notes="Per-game columns here are totals divided by games played for that team in that season.",
                 ),
             )
+            body += section(
+                "By Game",
+                stats_table(
+                    game_rows,
+                    "label",
+                    "Game",
+                    f'player-games-{player_key.replace(":", "-")}',
+                    link_template="{game_file}",
+                    notes="Each row is one game, so totals and per-game columns are identical for that match.",
+                    default_sort_key="label",
+                    default_sort_direction="desc",
+                ),
+            )
 
             write_text(
                 out_dir / "players" / player_file,
@@ -1002,8 +1275,12 @@ def build_site(db_path: Path, out_dir: Path) -> None:
                     f"{player_name} Stats",
                     body,
                     "../",
-                    intro=f"Individual career, season, and team breakdowns for {player_name}.",
+                    intro_html=(
+                        f'Individual career, season, team, and game breakdowns for '
+                        f'{player_name_markup(canonical_player_name, player_name)}.'
+                    ),
                     page_class="player-page",
+                    heading_html=f'{player_name_markup(canonical_player_name, player_name)} Stats',
                 ),
             )
     finally:

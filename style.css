@@ -11,6 +11,7 @@
   --team-primary: #7a1f1f;
   --team-secondary: #d7b690;
   --team-accent: #fffdf8;
+  --base-font-size: 16px;
 }
 
 * {
@@ -24,11 +25,24 @@ html {
 body {
   margin: 0;
   font-family: Georgia, "Times New Roman", serif;
+  font-size: var(--base-font-size);
   line-height: 1.45;
   color: var(--ink);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0)),
     var(--paper);
+}
+
+body[data-font-size="small"] {
+  --base-font-size: 15px;
+}
+
+body[data-font-size="medium"] {
+  --base-font-size: 16px;
+}
+
+body[data-font-size="large"] {
+  --base-font-size: 18px;
 }
 
 .site-header {
@@ -70,6 +84,16 @@ body.team-page .site-nav a:hover {
   text-decoration-color: currentColor;
 }
 
+body.team-page .site-setting,
+body.team-page .site-setting select {
+  color: color-mix(in srgb, var(--team-accent) 94%, white 6%);
+}
+
+body.team-page .site-setting select {
+  background: color-mix(in srgb, var(--team-primary) 40%, white 60%);
+  border-color: color-mix(in srgb, var(--team-accent) 35%, transparent);
+}
+
 body.team-page h2 {
   color: color-mix(in srgb, var(--team-primary) 78%, black 22%);
 }
@@ -103,6 +127,30 @@ h2 {
   align-items: center;
 }
 
+.site-settings {
+  margin-left: auto;
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.site-setting {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.92rem;
+}
+
+.site-setting select {
+  font: inherit;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+}
+
 a {
   color: var(--accent);
   text-decoration: none;
@@ -110,10 +158,6 @@ a {
 
 a:hover {
   text-decoration: underline;
-}
-
-.layout-toggle {
-  margin-left: auto;
 }
 
 .columns {
@@ -229,7 +273,7 @@ body.player-page main::after {
 
 .table-toolbar {
   position: sticky;
-  top: 6.2rem;
+  top: 7.4rem;
   z-index: 20;
   display: flex;
   gap: 0.75rem;
@@ -544,7 +588,7 @@ tbody tr.is-filtered-out {
 
 @media (max-width: 900px) {
   .table-toolbar {
-    top: 5.6rem;
+    top: 7rem;
   }
 
   .column-picker {
@@ -552,7 +596,7 @@ tbody tr.is-filtered-out {
     width: 100%;
   }
 
-  .layout-toggle {
+  .site-settings {
     margin-left: 0;
   }
 
@@ -573,7 +617,7 @@ tbody tr.is-filtered-out {
   }
 
   .table-toolbar {
-    top: 5.2rem;
+    top: 6.6rem;
   }
 
   .table-filter {
